@@ -5,7 +5,7 @@ use utf8;
 
 use Kwiki::Formatter;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 const config_class => 'Kwiki::Config';
 const class_id => 'formatter';
@@ -44,24 +44,25 @@ sub html {
     my $html = $self->SUPER::html;
     $html = $self->html_unescape($html);
 
+    my $keyword_enable = $self->hub->config->hatenaformatter_keyword_enable;
     my $cache;
-    if ($self->hub->config->hatenaformatter_keyword_cache_root) {
+    if ($keyword_enable && $self->hub->config->hatenaformatter_keyword_cache_root) {
         $cache = Cache::File->new(
             cache_root      => $self->hub->config->hatenaformatter_keyword_cache_root,
             default_expires => $self->hub->config->hatenaformatter_keyword_cache_expires,
         );
     }
 
-    my $formatter = Hatena::Formatter->new(
-        text_config => {
+    my %hatena_config = (
+            text_config => {
             permalink => $self->hub->config->script_name . '?' . $self->hub->cgi->page_name,
             hatenaid_href => 'http://www.hatena.ne.jp/user?userid=%s',
-        },
-        keyword_config => {
-            cache => $cache,
-            score => $self->hub->config->hatenaformatter_keyword_score,
-        },
+        }
     );
+    $hatena_config{keyword_config} = { cache => $cache, score => $self->hub->config->hatenaformatter_keyword_score }
+        if $keyword_enable;
+
+    my $formatter = Hatena::Formatter->new(%hatena_config);
     $formatter->register( hook => 'text_finalize', callback => sub {
         my($context, $option) = @_;
         my $html = $context->html;
@@ -98,6 +99,7 @@ In C<config.yaml>:
     hatenaformatter_keyword_cache_root: /tmp/hatenakeyword_cache_dir
     hatenaformatter_keyword_cache_expires: 1 day
     hatenaformatter_keyword_score: 20
+    hatenaformatter_keyword_enable: 1
 
 =head1 DESCRIPTION
 
@@ -126,4 +128,5 @@ __config/hatenaformatter.yaml__
 hatenaformatter_keyword_cache_root: /tmp/hatenaformatter_cache_root
 hatenaformatter_keyword_cache_expires: 1 day
 hatenaformatter_keyword_score: 20
+hatenaformatter_keyword_enable: 1
 
